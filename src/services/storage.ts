@@ -1,6 +1,6 @@
-import type { ParserIssue, ProtestTitle } from '../types/dashboard'
+import type { ImportSummary, ParserIssue, ProtestTitle } from '../types/dashboard'
 
-const STORAGE_KEY = 'dashboard-protestos:workbook:v1'
+const STORAGE_KEY = 'dashboard-protestos:workbook:v2'
 
 export interface PersistedDashboardData {
   records: ProtestTitle[]
@@ -8,6 +8,7 @@ export interface PersistedDashboardData {
   fileName: string
   sheetName: string
   importedAt: string
+  summary: ImportSummary
 }
 
 function canUseLocalStorage(): boolean {
@@ -60,4 +61,5 @@ export function clearDashboardData(): void {
   }
 
   window.localStorage.removeItem(STORAGE_KEY)
+  window.localStorage.removeItem('dashboard-protestos:workbook:v1')
 }

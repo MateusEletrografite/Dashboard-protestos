@@ -8,5 +8,3 @@ export const DEFAULT_FILTERS: DashboardFilters = {
   debtor: '',
   document: '',
 }
-
-export const STATUS_OPTIONS = ['Todos', 'Protestado', 'Em Cartório'] as const

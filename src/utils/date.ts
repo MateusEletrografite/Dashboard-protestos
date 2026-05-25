@@ -10,13 +10,13 @@ export function toISODate(date: Date): string {
 
 export function formatDate(isoDate: string | null): string {
   if (!isoDate) {
-    return 'Sem data'
+    return 'Nao preenchida na planilha'
   }
 
   const [year, month, day] = isoDate.split('-')
 
   if (!year || !month || !day) {
-    return 'Sem data'
+    return 'Nao preenchida na planilha'
   }
 
   return `${day}/${month}/${year}`

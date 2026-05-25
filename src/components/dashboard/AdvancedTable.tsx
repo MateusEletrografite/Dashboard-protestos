@@ -135,11 +135,11 @@ export function AdvancedTable({ records }: AdvancedTableProps) {
                 <tr key={record.id} className="border-t border-surface-line bg-white transition hover:bg-surface-muted/60">
                   <td className="whitespace-nowrap px-4 py-3 text-ink-body">{formatDate(record.dueDate)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-ink-body">{formatDate(record.issueDate)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-ink-body">{record.account || 'Nao informado'}</td>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-ink-strong">{record.document || 'Nao informado'}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-ink-body">{record.account}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-ink-strong">{record.document}</td>
                   <td className="max-w-[340px] px-4 py-3 text-ink-body">
                     <span className="block truncate" title={record.debtor}>
-                      {record.debtor || 'Nao informado'}
+                      {record.debtor}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">

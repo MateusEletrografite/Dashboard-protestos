@@ -1,4 +1,4 @@
-export type ProtestStatus = 'Protestado' | 'Em Cartório'
+export type ProtestStatus = string
 
 export interface ProtestTitle {
   id: string
@@ -21,10 +21,22 @@ export interface ParserIssue {
   message: string
 }
 
+export interface ImportSummary {
+  worksheetRows: number
+  importedRows: number
+  skippedEmptyRows: number
+  skippedSummaryRows: number
+  skippedInvalidRows: number
+  sheetTotalValue: number | null
+  calculatedTotalValue: number
+  totalMatchesSheet: boolean | null
+}
+
 export interface ParsedWorkbook {
   records: ProtestTitle[]
   issues: ParserIssue[]
   sheetName: string
+  summary: ImportSummary
 }
 
 export interface DashboardFilters {
@@ -40,6 +52,7 @@ export interface DashboardMetrics {
   totalValue: number
   protestedValue: number
   registryValue: number
+  otherStatusValue: number
   titleCount: number
   averageTicket: number
   maxTitleValue: number
@@ -69,6 +82,7 @@ export interface RankingPoint {
 export interface DashboardAnalytics {
   filteredRecords: ProtestTitle[]
   accounts: string[]
+  statuses: ProtestStatus[]
   metrics: DashboardMetrics
   temporalEvolution: TimeSeriesPoint[]
   statusDistribution: StatusDistributionPoint[]

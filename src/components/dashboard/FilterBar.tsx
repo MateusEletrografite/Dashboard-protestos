@@ -1,15 +1,16 @@
 import { RotateCcw, Search } from 'lucide-react'
-import { DEFAULT_FILTERS, STATUS_OPTIONS } from '../../data/filters'
+import { DEFAULT_FILTERS } from '../../data/filters'
 import type { DashboardFilters } from '../../types/dashboard'
 
 interface FilterBarProps {
   filters: DashboardFilters
   accounts: string[]
+  statuses: string[]
   resultCount: number
   onChange: (filters: DashboardFilters) => void
 }
 
-export function FilterBar({ filters, accounts, resultCount, onChange }: FilterBarProps) {
+export function FilterBar({ filters, accounts, statuses, resultCount, onChange }: FilterBarProps) {
   const updateFilter = <Key extends keyof DashboardFilters>(key: Key, value: DashboardFilters[Key]) => {
     onChange({ ...filters, [key]: value })
   }
@@ -71,7 +72,8 @@ export function FilterBar({ filters, accounts, resultCount, onChange }: FilterBa
             value={filters.status}
             onChange={(event) => updateFilter('status', event.target.value as DashboardFilters['status'])}
           >
-            {STATUS_OPTIONS.map((status) => (
+            <option value="Todos">Todos</option>
+            {statuses.map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>

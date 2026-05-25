@@ -22,9 +22,16 @@ interface ChartsGridProps {
   analytics: DashboardAnalytics
 }
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   Protestado: chartColors.red,
   'Em Cartório': chartColors.blue,
+  Aberto: chartColors.green,
+  'Corrigido Vencimento': chartColors.amber,
+  'Sem status': chartColors.slate,
+}
+
+function statusColor(status: string): string {
+  return statusColors[status] ?? chartColors.teal
 }
 
 function currencyTooltip(value: unknown) {
@@ -78,7 +85,7 @@ export function ChartsGrid({ analytics }: ChartsGridProps) {
               paddingAngle={4}
             >
               {analytics.statusDistribution.map((entry) => (
-                <Cell key={entry.status} fill={statusColors[entry.status]} />
+                <Cell key={entry.status} fill={statusColor(entry.status)} />
               ))}
             </Pie>
             <Tooltip formatter={(value) => currencyTooltip(value)} />

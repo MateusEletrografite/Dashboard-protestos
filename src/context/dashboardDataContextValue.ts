@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { ParserIssue, ProtestTitle } from '../types/dashboard'
+import type { ImportSummary, ParserIssue, ProtestTitle } from '../types/dashboard'
 
 export interface DashboardDataContextValue {
   records: ProtestTitle[]
@@ -7,6 +7,7 @@ export interface DashboardDataContextValue {
   fileName: string
   sheetName: string
   importedAt: string
+  summary: ImportSummary
   isParsing: boolean
   error: string
   hasData: boolean

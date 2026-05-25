@@ -3,7 +3,6 @@ import type {
   DashboardAnalytics,
   DashboardFilters,
   DashboardMetrics,
-  ProtestStatus,
   ProtestTitle,
   RankingPoint,
   StatusDistributionPoint,
@@ -27,12 +26,9 @@ function applyFilters(records: ProtestTitle[], filters: DashboardFilters): Prote
 
 function calculateMetrics(records: ProtestTitle[]): DashboardMetrics {
   const totalValue = records.reduce((sum, record) => sum + record.value, 0)
-  const protestedValue = records
-    .filter((record) => record.status === 'Protestado')
-    .reduce((sum, record) => sum + record.value, 0)
-  const registryValue = records
-    .filter((record) => record.status === 'Em Cartório')
-    .reduce((sum, record) => sum + record.value, 0)
+  const protestedValue = records.filter((record) => record.status === 'Protestado').reduce((sum, record) => sum + record.value, 0)
+  const registryValue = records.filter((record) => record.status === 'Em Cartório').reduce((sum, record) => sum + record.value, 0)
+  const otherStatusValue = totalValue - protestedValue - registryValue
   const maxTitleValue = records.reduce((max, record) => Math.max(max, record.value), 0)
   const overdueCount = records.filter((record) => isBeforeToday(record.dueDate)).length
 
@@ -40,6 +36,7 @@ function calculateMetrics(records: ProtestTitle[]): DashboardMetrics {
     totalValue,
     protestedValue,
     registryValue,
+    otherStatusValue,
     titleCount: records.length,
     averageTicket: records.length > 0 ? totalValue / records.length : 0,
     maxTitleValue,
@@ -58,12 +55,7 @@ function groupByMonth(records: ProtestTitle[], dateSelector: (record: ProtestTit
       return
     }
 
-    const current = groups.get(monthKey) ?? {
-      label: formatMonthLabel(monthKey),
-      dateKey: monthKey,
-      valor: 0,
-      titulos: 0,
-    }
+    const current = groups.get(monthKey) ?? { label: formatMonthLabel(monthKey), dateKey: monthKey, valor: 0, titulos: 0 }
 
     current.valor += record.value
     current.titulos += 1
@@ -77,7 +69,7 @@ function groupRanking(records: ProtestTitle[], selector: (record: ProtestTitle) 
   const groups = new Map<string, RankingPoint>()
 
   records.forEach((record) => {
-    const name = selector(record) || 'Nao informado'
+    const name = selector(record)
     const current = groups.get(name) ?? { name, valor: 0, titulos: 0 }
 
     current.valor += record.value
@@ -91,17 +83,11 @@ function groupRanking(records: ProtestTitle[], selector: (record: ProtestTitle) 
 }
 
 function buildStatusDistribution(records: ProtestTitle[]): StatusDistributionPoint[] {
-  const statuses: ProtestStatus[] = ['Protestado', 'Em Cartório']
-
-  return statuses.map((status) => {
-    const scoped = records.filter((record) => record.status === status)
-
-    return {
-      status,
-      valor: scoped.reduce((sum, record) => sum + record.value, 0),
-      titulos: scoped.length,
-    }
-  })
+  return groupRanking(records, (record) => record.status).map((point) => ({
+    status: point.name,
+    valor: point.valor,
+    titulos: point.titulos,
+  }))
 }
 
 export function useDashboardAnalytics(records: ProtestTitle[], filters: DashboardFilters): DashboardAnalytics {
@@ -110,14 +96,18 @@ export function useDashboardAnalytics(records: ProtestTitle[], filters: Dashboar
     const accounts = Array.from(new Set(records.map((record) => record.account).filter(Boolean))).sort((a, b) =>
       a.localeCompare(b, 'pt-BR'),
     )
+    const statuses = Array.from(new Set(records.map((record) => record.status).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, 'pt-BR'),
+    )
 
     return {
-      filteredRecords: filteredRecords.sort((a, b) => sortISODate(a.dueDate, b.dueDate)),
+      filteredRecords: [...filteredRecords].sort((a, b) => sortISODate(a.dueDate, b.dueDate)),
       accounts,
+      statuses,
       metrics: calculateMetrics(filteredRecords),
       temporalEvolution: groupByMonth(filteredRecords, (record) => record.issueDate),
       statusDistribution: buildStatusDistribution(filteredRecords),
-      topDebtors: groupRanking(filteredRecords, (record) => record.debtor, 8),
+      topDebtors: groupRanking(filteredRecords, (record) => record.debtor, 10),
       accountValues: groupRanking(filteredRecords, (record) => record.account),
       dueCurve: groupByMonth(filteredRecords, (record) => record.dueDate),
     }

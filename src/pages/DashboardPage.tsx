@@ -42,7 +42,7 @@ function formatImportedAt(importedAt: string): string {
 }
 
 export function DashboardPage() {
-  const { records, issues, fileName, sheetName, importedAt, isParsing, error, importFile, clearData, hasData } = useDashboardData()
+  const { records, issues, fileName, sheetName, importedAt, summary, isParsing, error, importFile, clearData, hasData } = useDashboardData()
   const [filters, setFilters] = useState<DashboardFilters>(DEFAULT_FILTERS)
   const analytics = useDashboardAnalytics(records, filters)
 
@@ -70,6 +70,13 @@ export function DashboardPage() {
         detail: `${percentage(metrics.registryValue, metrics.totalValue)} do valor filtrado`,
         icon: Landmark,
         tone: 'blue' as const,
+      },
+      {
+        title: 'Outros status',
+        value: currencyFormatter.format(metrics.otherStatusValue),
+        detail: 'Aberto, corrigido ou sem status',
+        icon: BadgeDollarSign,
+        tone: 'amber' as const,
       },
       {
         title: 'Quantidade títulos',
@@ -146,6 +153,22 @@ export function DashboardPage() {
           <span>
             Registros <strong className="font-semibold text-ink-body">{integerFormatter.format(records.length)}</strong>
           </span>
+          {summary.sheetTotalValue !== null ? (
+            <span>
+              Total da planilha <strong className="font-semibold text-ink-body">{currencyFormatter.format(summary.sheetTotalValue)}</strong>
+            </span>
+          ) : null}
+          {summary.skippedSummaryRows > 0 ? (
+            <span>
+              Totais removidos <strong className="font-semibold text-ink-body">{integerFormatter.format(summary.skippedSummaryRows)}</strong>
+            </span>
+          ) : null}
+          {summary.skippedInvalidRows > 0 ? (
+            <span>
+              Linhas inválidas removidas{' '}
+              <strong className="font-semibold text-ink-body">{integerFormatter.format(summary.skippedInvalidRows)}</strong>
+            </span>
+          ) : null}
         </div>
         <button
           type="button"
@@ -181,7 +204,7 @@ export function DashboardPage() {
         </details>
       ) : null}
 
-      <FilterBar filters={filters} accounts={analytics.accounts} resultCount={analytics.filteredRecords.length} onChange={setFilters} />
+      <FilterBar filters={filters} accounts={analytics.accounts} statuses={analytics.statuses} resultCount={analytics.filteredRecords.length} onChange={setFilters} />
 
       <section className="panel grid overflow-hidden sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi) => (

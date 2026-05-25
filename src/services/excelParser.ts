@@ -1,4 +1,4 @@
-import type { ParsedWorkbook, ParserIssue, ProtestStatus, ProtestTitle } from '../types/dashboard'
+import type { ImportSummary, ParsedWorkbook, ParserIssue, ProtestStatus, ProtestTitle } from '../types/dashboard'
 import { parseBrazilianCurrency } from '../utils/currency'
 import { toISODate } from '../utils/date'
 import { normalizeCellText, normalizeHeader } from '../utils/text'
@@ -7,15 +7,15 @@ type FieldKey = 'cart' | 'account' | 'issueDate' | 'dueDate' | 'originalDueDate'
 type XLSXModule = typeof import('xlsx')
 
 const HEADER_ALIASES: Record<FieldKey, string[]> = {
-  cart: ['cart'],
-  account: ['conta'],
-  issueDate: ['emissao'],
-  dueDate: ['vencto', 'vencimento'],
-  originalDueDate: ['vctooriginal', 'vencimentooriginal'],
-  document: ['doc', 'documento'],
-  debtor: ['sacado', 'cliente', 'devedor'],
-  value: ['valor'],
-  stamp: ['carimbo', 'status'],
+  cart: ['cart', 'carteirafidc'],
+  account: ['conta', 'carteira'],
+  issueDate: ['emissao', 'dataemissao', 'dtemissao'],
+  dueDate: ['vencto', 'vencimento', 'datavencimento', 'dtvencimento'],
+  originalDueDate: ['vctooriginal', 'vencimentooriginal', 'vencoriginal'],
+  document: ['doc', 'documento', 'titulo', 'duplicata'],
+  debtor: ['sacado', 'cliente', 'devedor', 'razaosocial'],
+  value: ['valor', 'vlr', 'valortitulo'],
+  stamp: ['carimbo', 'status', 'situacao'],
 }
 
 const REQUIRED_FIELDS: FieldKey[] = ['cart', 'account', 'issueDate', 'dueDate', 'document', 'debtor', 'value', 'stamp']
@@ -24,8 +24,18 @@ function isEmptyRow(row: unknown[]): boolean {
   return row.every((cell) => normalizeCellText(cell).length === 0)
 }
 
+function lastNonEmptyRowIndex(rows: unknown[][]): number {
+  for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex -= 1) {
+    if (!isEmptyRow(rows[rowIndex])) {
+      return rowIndex
+    }
+  }
+
+  return -1
+}
+
 function resolveHeaderMap(rows: unknown[][]): { headerRowIndex: number; columns: Record<FieldKey, number> } | null {
-  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 20); rowIndex += 1) {
+  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 30); rowIndex += 1) {
     const normalizedHeaders = rows[rowIndex].map(normalizeHeader)
     const columns = {} as Record<FieldKey, number>
 
@@ -94,10 +104,7 @@ function buildISODate(year: number, month: number, day: number): string | null {
   }
 
   const date = new Date(year, month - 1, day)
-  const isValid =
-    date.getFullYear() === year &&
-    date.getMonth() === month - 1 &&
-    date.getDate() === day
+  const isValid = date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
 
   return isValid ? toISODate(date) : null
 }
@@ -122,24 +129,118 @@ function parseDateCell(value: unknown, rowNumber: number, field: string, issues:
   const parsed = parseDateString(normalizeCellText(value), xlsx)
 
   if (!parsed) {
-    issues.push({
-      rowNumber,
-      field,
-      message: 'Data invalida ou em formato nao reconhecido.',
-    })
+    issues.push({ rowNumber, field, message: 'Data invalida ou em formato nao reconhecido.' })
   }
 
   return parsed
 }
 
-function deriveStatus(stamp: string): ProtestStatus {
-  const normalized = normalizeHeader(stamp)
+function titleCaseStatus(value: string): string {
+  return value
+    .toLocaleLowerCase('pt-BR')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toLocaleUpperCase('pt-BR') + part.slice(1))
+    .join(' ')
+}
 
-  return normalized.includes('protest') ? 'Protestado' : 'Em Cartório'
+function deriveStatus(stamp: string): ProtestStatus {
+  const raw = normalizeCellText(stamp)
+  const normalized = normalizeHeader(raw)
+
+  if (!normalized) {
+    return 'Sem status'
+  }
+
+  if (normalized.includes('protest')) {
+    return 'Protestado'
+  }
+
+  if (normalized.includes('cartorio')) {
+    return 'Em Cartório'
+  }
+
+  if (normalized.includes('aberto')) {
+    return 'Aberto'
+  }
+
+  if (normalized.includes('corrigido') && normalized.includes('venc')) {
+    return 'Corrigido Vencimento'
+  }
+
+  return titleCaseStatus(raw)
 }
 
 function cell(row: unknown[], index: number | undefined): unknown {
   return index === undefined ? '' : row[index]
+}
+
+function hasCoreTitleIdentity(row: unknown[], columns: Record<FieldKey, number>): boolean {
+  const account = normalizeCellText(cell(row, columns.account))
+  const document = normalizeCellText(cell(row, columns.document))
+  const debtor = normalizeCellText(cell(row, columns.debtor))
+
+  return Boolean(account && document && debtor)
+}
+
+function hasAnyTitleDate(row: unknown[], columns: Record<FieldKey, number>): boolean {
+  const fields: FieldKey[] = ['issueDate', 'dueDate', 'originalDueDate']
+
+  return fields.some((field) => normalizeCellText(cell(row, columns[field])).length > 0)
+}
+
+function isLikelyTotalLabel(value: string): boolean {
+  const normalized = normalizeHeader(value)
+
+  return ['total', 'totais', 'subtotal', 'resumo', 'soma'].some((token) => normalized.includes(token))
+}
+
+function isValidTitleRow(row: unknown[], columns: Record<FieldKey, number>): boolean {
+  const account = normalizeCellText(cell(row, columns.account))
+  const document = normalizeCellText(cell(row, columns.document))
+  const debtor = normalizeCellText(cell(row, columns.debtor))
+  const value = parseBrazilianCurrency(cell(row, columns.value))
+  const issueDateRaw = normalizeCellText(cell(row, columns.issueDate))
+  const dueDateRaw = normalizeCellText(cell(row, columns.dueDate))
+
+  if (value <= 0) {
+    return false
+  }
+
+  if (!account || !document || !debtor) {
+    return false
+  }
+
+  if ([account, document, debtor].some(isLikelyTotalLabel)) {
+    return false
+  }
+
+  if (!issueDateRaw && !dueDateRaw) {
+    return false
+  }
+
+  return true
+}
+
+function isFooterTotalRow(row: unknown[], columns: Record<FieldKey, number>): boolean {
+  const value = parseBrazilianCurrency(cell(row, columns.value))
+
+  if (value === 0) {
+    return false
+  }
+
+  const textFields: FieldKey[] = ['cart', 'account', 'document', 'debtor', 'stamp']
+  const rowText = textFields.map((field) => normalizeCellText(cell(row, columns[field]))).join(' ')
+
+  if (isLikelyTotalLabel(rowText)) {
+    return true
+  }
+
+  if (!hasCoreTitleIdentity(row, columns) && !hasAnyTitleDate(row, columns)) {
+    return true
+  }
+
+  return false
 }
 
 function buildRecord(
@@ -161,6 +262,10 @@ function buildRecord(
     return null
   }
 
+  if (!isValidTitleRow(row, columns)) {
+    return null
+  }
+
   if (!document) {
     issues.push({ rowNumber, field: 'Doc.', message: 'Documento ausente.' })
   }
@@ -173,12 +278,20 @@ function buildRecord(
     issues.push({ rowNumber, field: 'Valor', message: 'Valor ausente.' })
   }
 
+  if (!stamp) {
+    issues.push({ rowNumber, field: 'Carimbo', message: 'Status ausente; classificado como Sem status.' })
+  }
+
   const issueDate = parseDateCell(cell(row, columns.issueDate), rowNumber, 'Emissão', issues, xlsx)
   const dueDate = parseDateCell(cell(row, columns.dueDate), rowNumber, 'Vencto.', issues, xlsx)
   const originalDueDate = parseDateCell(cell(row, columns.originalDueDate), rowNumber, 'Vcto Original.', issues, xlsx)
 
+  if (!issueDate) {
+    issues.push({ rowNumber, field: 'Emissão', message: 'Data de emissão ausente.' })
+  }
+
   return {
-    id: `${rowNumber}-${document || debtor}-${value}`,
+    id: `${rowNumber}-${document || debtor || 'registro'}-${value}`,
     rowNumber,
     cart,
     account,
@@ -210,34 +323,66 @@ export async function parseWorkbookFile(file: File): Promise<ParsedWorkbook> {
   }
 
   const sheet = workbook.Sheets[sheetName]
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-    header: 1,
-    defval: '',
-    raw: true,
-  })
-
-  const headerMap = resolveHeaderMap(rows)
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '', raw: true, blankrows: true })
+  const lastDataRowIndex = lastNonEmptyRowIndex(rows)
+  const effectiveRows = lastDataRowIndex >= 0 ? rows.slice(0, lastDataRowIndex + 1) : rows
+  const headerMap = resolveHeaderMap(effectiveRows)
 
   if (!headerMap) {
     throw new Error('Nao foi possivel localizar as colunas obrigatorias da planilha.')
   }
 
   const issues: ParserIssue[] = []
-  const records = rows
-    .slice(headerMap.headerRowIndex + 1)
-    .flatMap((row, index) => {
-      if (isEmptyRow(row)) {
-        return []
-      }
+  const records: ProtestTitle[] = []
+  let skippedEmptyRows = 0
+  let skippedSummaryRows = 0
+  let skippedInvalidRows = 0
+  let sheetTotalValue: number | null = null
 
-      const record = buildRecord(row, headerMap.headerRowIndex + index + 2, headerMap.columns, issues, XLSX)
+  effectiveRows.slice(headerMap.headerRowIndex + 1).forEach((row, index) => {
+    const rowNumber = headerMap.headerRowIndex + index + 2
 
-      return record ? [record] : []
-    })
+    if (isEmptyRow(row)) {
+      skippedEmptyRows += 1
+      return
+    }
 
-  return {
-    records,
-    issues,
-    sheetName,
+    if (isFooterTotalRow(row, headerMap.columns)) {
+      skippedSummaryRows += 1
+      sheetTotalValue = parseBrazilianCurrency(cell(row, headerMap.columns.value))
+      issues.push({ rowNumber, field: 'Valor', message: 'Linha de total/subtotal detectada e excluida dos titulos para evitar duplicidade.' })
+      return
+    }
+
+    if (!isValidTitleRow(row, headerMap.columns)) {
+      skippedInvalidRows += 1
+      issues.push({
+        rowNumber,
+        field: 'Registro',
+        message: 'Linha ignorada por nao possuir dados essenciais de um titulo: conta, documento, sacado, valor e data.',
+      })
+      return
+    }
+
+    const record = buildRecord(row, rowNumber, headerMap.columns, issues, XLSX)
+
+    if (record) {
+      records.push(record)
+    }
+  })
+
+  const calculatedTotalValue = records.reduce((sum, record) => sum + record.value, 0)
+  const totalMatchesSheet = sheetTotalValue === null ? null : Math.abs(sheetTotalValue - calculatedTotalValue) < 0.01
+  const summary: ImportSummary = {
+    worksheetRows: Math.max(effectiveRows.length - headerMap.headerRowIndex - 1, 0),
+    importedRows: records.length,
+    skippedEmptyRows,
+    skippedSummaryRows,
+    skippedInvalidRows,
+    sheetTotalValue,
+    calculatedTotalValue,
+    totalMatchesSheet,
   }
+
+  return { records, issues, sheetName, summary }
 }

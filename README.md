@@ -18,8 +18,8 @@ SPA corporativa para análise de títulos em protesto/cartório a partir de plan
 - Parser client-side para datas seriais do Excel, valores monetários brasileiros e campos inconsistentes.
 - Persistência local da última base importada via `localStorage`.
 - Filtros por emissão, conta, status, sacado e documento.
-- KPIs financeiros: valor total, total protestado, total em cartório, quantidade, ticket médio, maior título, vencidos e a vencer.
-- Gráficos de evolução temporal, distribuição por status, top sacados, valores por conta e curva de vencimentos.
+- KPIs financeiros: valor total real dos títulos, total protestado, total em cartório, outros status, quantidade, ticket médio, maior título, vencidos e a vencer.
+- Gráficos de evolução temporal, distribuição por todos os status encontrados na planilha, top sacados, valores por conta e curva de vencimentos.
 - Tabela com busca, ordenação, paginação e exportação CSV.
 
 ## Colunas esperadas
@@ -41,7 +41,10 @@ A planilha deve conter as seguintes colunas:
 O status é derivado do campo `Carimbo`:
 
 - `Protestado` quando o campo contém referência a protesto.
-- `Em Cartório` nos demais casos.
+- `Em Cartório` quando o campo contém referência a cartório.
+- `Aberto`, `Corrigido Vencimento`, `Sem status` e outros status reais são preservados em vez de serem agrupados indevidamente.
+
+Linhas de rodapé/total que possuem apenas a coluna `Valor` preenchida são detectadas e removidas dos títulos para evitar duplicidade. O valor do rodapé continua aparecendo no resumo da importação para conferência contra o total calculado.
 
 ## Execução local
 

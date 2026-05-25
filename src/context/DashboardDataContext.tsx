@@ -14,6 +14,16 @@ const emptyPersistedData: PersistedDashboardData = {
   fileName: '',
   sheetName: '',
   importedAt: '',
+  summary: {
+    worksheetRows: 0,
+    importedRows: 0,
+    skippedEmptyRows: 0,
+    skippedSummaryRows: 0,
+    skippedInvalidRows: 0,
+    sheetTotalValue: null,
+    calculatedTotalValue: 0,
+    totalMatchesSheet: null,
+  },
 }
 
 export function DashboardDataProvider({ children }: { children: ReactNode }) {
@@ -33,6 +43,7 @@ export function DashboardDataProvider({ children }: { children: ReactNode }) {
         fileName: file.name,
         sheetName: parsed.sheetName,
         importedAt: new Date().toISOString(),
+        summary: parsed.summary,
       }
 
       setData(nextData)
