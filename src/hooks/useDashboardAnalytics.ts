@@ -3,6 +3,8 @@ import type {
   DashboardAnalytics,
   DashboardFilters,
   DashboardMetrics,
+  DelinquencySnapshot,
+  DelinquencyTrendPoint,
   ProtestTitle,
   RankingPoint,
   StatusDistributionPoint,
@@ -24,11 +26,16 @@ function applyFilters(records: ProtestTitle[], filters: DashboardFilters): Prote
   })
 }
 
+function isDelinquent(record: ProtestTitle): boolean {
+  return record.status === 'Protestado' || record.status === 'Em Cartório'
+}
+
 function calculateMetrics(records: ProtestTitle[]): DashboardMetrics {
   const totalValue = records.reduce((sum, record) => sum + record.value, 0)
   const protestedValue = records.filter((record) => record.status === 'Protestado').reduce((sum, record) => sum + record.value, 0)
   const registryValue = records.filter((record) => record.status === 'Em Cartório').reduce((sum, record) => sum + record.value, 0)
   const otherStatusValue = totalValue - protestedValue - registryValue
+  const delinquencyValue = protestedValue + registryValue
   const maxTitleValue = records.reduce((max, record) => Math.max(max, record.value), 0)
   const overdueCount = records.filter((record) => isBeforeToday(record.dueDate)).length
 
@@ -37,6 +44,7 @@ function calculateMetrics(records: ProtestTitle[]): DashboardMetrics {
     protestedValue,
     registryValue,
     otherStatusValue,
+    delinquencyValue,
     titleCount: records.length,
     averageTicket: records.length > 0 ? totalValue / records.length : 0,
     maxTitleValue,
@@ -63,6 +71,58 @@ function groupByMonth(records: ProtestTitle[], dateSelector: (record: ProtestTit
   })
 
   return Array.from(groups.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+}
+
+function buildDelinquencyTrend(records: ProtestTitle[]): DelinquencyTrendPoint[] {
+  const points = groupByMonth(records.filter(isDelinquent), (record) => record.dueDate)
+
+  return points.map((point, index) => {
+    const previous = points[index - 1]
+    const variation = previous && previous.valor > 0 ? ((point.valor - previous.valor) / previous.valor) * 100 : null
+
+    return {
+      label: point.label,
+      dateKey: point.dateKey,
+      inadimplencia: point.valor,
+      titulos: point.titulos,
+      variacao: variation,
+    }
+  })
+}
+
+function buildDelinquencySnapshot(trend: DelinquencyTrendPoint[]): DelinquencySnapshot {
+  if (trend.length === 0) {
+    return {
+      currentMonthLabel: '-',
+      previousMonthLabel: '-',
+      currentValue: 0,
+      previousValue: 0,
+      variationPercent: 0,
+      variationValue: 0,
+      peakValue: 0,
+      peakMonthLabel: '-',
+      dropFromPeakPercent: 0,
+    }
+  }
+
+  const current = trend[trend.length - 1]
+  const previous = trend[trend.length - 2] ?? current
+  const peak = trend.reduce((max, point) => (point.inadimplencia > max.inadimplencia ? point : max), trend[0])
+  const variationValue = current.inadimplencia - previous.inadimplencia
+  const variationPercent = previous.inadimplencia > 0 ? (variationValue / previous.inadimplencia) * 100 : 0
+  const dropFromPeakPercent = peak.inadimplencia > 0 ? ((peak.inadimplencia - current.inadimplencia) / peak.inadimplencia) * 100 : 0
+
+  return {
+    currentMonthLabel: current.label,
+    previousMonthLabel: previous.label,
+    currentValue: current.inadimplencia,
+    previousValue: previous.inadimplencia,
+    variationPercent,
+    variationValue,
+    peakValue: peak.inadimplencia,
+    peakMonthLabel: peak.label,
+    dropFromPeakPercent,
+  }
 }
 
 function groupRanking(records: ProtestTitle[], selector: (record: ProtestTitle) => string, limit?: number): RankingPoint[] {
@@ -93,6 +153,7 @@ function buildStatusDistribution(records: ProtestTitle[]): StatusDistributionPoi
 export function useDashboardAnalytics(records: ProtestTitle[], filters: DashboardFilters): DashboardAnalytics {
   return useMemo(() => {
     const filteredRecords = applyFilters(records, filters)
+    const delinquencyTrend = buildDelinquencyTrend(filteredRecords)
     const accounts = Array.from(new Set(records.map((record) => record.account).filter(Boolean))).sort((a, b) =>
       a.localeCompare(b, 'pt-BR'),
     )
@@ -110,6 +171,8 @@ export function useDashboardAnalytics(records: ProtestTitle[], filters: Dashboar
       topDebtors: groupRanking(filteredRecords, (record) => record.debtor, 10),
       accountValues: groupRanking(filteredRecords, (record) => record.account),
       dueCurve: groupByMonth(filteredRecords, (record) => record.dueDate),
+      delinquencyTrend,
+      delinquencySnapshot: buildDelinquencySnapshot(delinquencyTrend),
     }
   }, [filters, records])
 }

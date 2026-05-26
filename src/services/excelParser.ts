@@ -189,6 +189,12 @@ function hasAnyTitleDate(row: unknown[], columns: Record<FieldKey, number>): boo
   return fields.some((field) => normalizeCellText(cell(row, columns[field])).length > 0)
 }
 
+function isInternalCompanyDebtor(value: string): boolean {
+  const normalized = normalizeHeader(value)
+
+  return normalized.includes('tsttudoprepferr') || normalized.includes('eletmaqltda')
+}
+
 function isLikelyTotalLabel(value: string): boolean {
   const normalized = normalizeHeader(value)
 
@@ -212,6 +218,10 @@ function isValidTitleRow(row: unknown[], columns: Record<FieldKey, number>): boo
   }
 
   if ([account, document, debtor].some(isLikelyTotalLabel)) {
+    return false
+  }
+
+  if (isInternalCompanyDebtor(debtor)) {
     return false
   }
 
@@ -359,7 +369,7 @@ export async function parseWorkbookFile(file: File): Promise<ParsedWorkbook> {
       issues.push({
         rowNumber,
         field: 'Registro',
-        message: 'Linha ignorada por nao possuir dados essenciais de um titulo: conta, documento, sacado, valor e data.',
+        message: 'Linha ignorada por nao possuir dados essenciais de um titulo ou por ser lancamento interno da propria empresa.',
       })
       return
     }

@@ -1,6 +1,6 @@
 import type { ImportSummary, ParserIssue, ProtestTitle } from '../types/dashboard'
 
-const STORAGE_KEY = 'dashboard-protestos:workbook:v2'
+const STORAGE_KEY = 'dashboard-protestos:workbook:v4'
 
 export interface PersistedDashboardData {
   records: ProtestTitle[]
@@ -62,4 +62,6 @@ export function clearDashboardData(): void {
 
   window.localStorage.removeItem(STORAGE_KEY)
   window.localStorage.removeItem('dashboard-protestos:workbook:v1')
+  window.localStorage.removeItem('dashboard-protestos:workbook:v2')
+  window.localStorage.removeItem('dashboard-protestos:workbook:v3')
 }

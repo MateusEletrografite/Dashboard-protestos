@@ -53,11 +53,32 @@ export interface DashboardMetrics {
   protestedValue: number
   registryValue: number
   otherStatusValue: number
+  delinquencyValue: number
   titleCount: number
   averageTicket: number
   maxTitleValue: number
   overdueCount: number
   openCount: number
+}
+
+export interface DelinquencyTrendPoint {
+  label: string
+  dateKey: string
+  inadimplencia: number
+  titulos: number
+  variacao: number | null
+}
+
+export interface DelinquencySnapshot {
+  currentMonthLabel: string
+  previousMonthLabel: string
+  currentValue: number
+  previousValue: number
+  variationPercent: number
+  variationValue: number
+  peakValue: number
+  peakMonthLabel: string
+  dropFromPeakPercent: number
 }
 
 export interface TimeSeriesPoint {
@@ -89,6 +110,8 @@ export interface DashboardAnalytics {
   topDebtors: RankingPoint[]
   accountValues: RankingPoint[]
   dueCurve: TimeSeriesPoint[]
+  delinquencyTrend: DelinquencyTrendPoint[]
+  delinquencySnapshot: DelinquencySnapshot
 }
 
 export type SortDirection = 'asc' | 'desc'

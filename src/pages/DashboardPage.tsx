@@ -7,6 +7,7 @@ import {
   Landmark,
   ReceiptText,
   Trash2,
+  TrendingDown,
   TrendingUp,
 } from 'lucide-react'
 import { Suspense, lazy, useMemo, useState } from 'react'
@@ -28,6 +29,16 @@ function percentage(value: number, total: number): string {
   }
 
   return `${decimalFormatter.format((value / total) * 100)}%`
+}
+
+function signedPercent(value: number): string {
+  const formatted = Math.abs(value).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+
+  if (value < 0) {
+    return `-${formatted}%`
+  }
+
+  return `+${formatted}%`
 }
 
 function formatImportedAt(importedAt: string): string {
@@ -70,6 +81,13 @@ export function DashboardPage() {
         detail: `${percentage(metrics.registryValue, metrics.totalValue)} do valor filtrado`,
         icon: Landmark,
         tone: 'blue' as const,
+      },
+      {
+        title: 'Inadimplência',
+        value: currencyFormatter.format(metrics.delinquencyValue),
+        detail: 'Protestado + Em Cartório',
+        icon: AlertTriangle,
+        tone: 'red' as const,
       },
       {
         title: 'Outros status',
@@ -206,7 +224,74 @@ export function DashboardPage() {
 
       <FilterBar filters={filters} accounts={analytics.accounts} statuses={analytics.statuses} resultCount={analytics.filteredRecords.length} onChange={setFilters} />
 
-      <section className="panel grid overflow-hidden sm:grid-cols-2 lg:grid-cols-4">
+      <section className="overflow-hidden rounded-xl border border-finance-green/20 bg-gradient-to-br from-white via-white to-emerald-50 shadow-panel">
+        <div className="grid gap-0 lg:grid-cols-[1.25fr_0.75fr]">
+          <div className="p-5 sm:p-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-finance-green/20 bg-finance-green/5 px-3 py-1 text-xs font-semibold text-finance-green">
+              <TrendingDown size={15} />
+              Indicador de recuperação
+            </div>
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-ink-strong sm:text-3xl">
+              Queda da inadimplência em {analytics.delinquencySnapshot.currentMonthLabel}
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
+              O painel compara mês a mês os títulos classificados como Protestado ou Em Cartório pela data de vencimento, destacando redução, pico da carteira e valor atual em risco.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-surface-line bg-white/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Mês atual</p>
+                <p className="mt-2 text-xl font-semibold text-ink-strong">{currencyFormatter.format(analytics.delinquencySnapshot.currentValue)}</p>
+                <p className="mt-1 text-xs text-ink-muted">{analytics.delinquencySnapshot.currentMonthLabel}</p>
+              </div>
+              <div className="rounded-lg border border-surface-line bg-white/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Variação mensal</p>
+                <p className={`mt-2 text-xl font-semibold ${analytics.delinquencySnapshot.variationPercent <= 0 ? 'text-finance-green' : 'text-finance-red'}`}>
+                  {signedPercent(analytics.delinquencySnapshot.variationPercent)}
+                </p>
+                <p className="mt-1 text-xs text-ink-muted">vs. {analytics.delinquencySnapshot.previousMonthLabel}</p>
+              </div>
+              <div className="rounded-lg border border-surface-line bg-white/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Queda do pico</p>
+                <p className="mt-2 text-xl font-semibold text-finance-green">{analytics.delinquencySnapshot.dropFromPeakPercent.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</p>
+                <p className="mt-1 text-xs text-ink-muted">pico em {analytics.delinquencySnapshot.peakMonthLabel}</p>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-surface-line bg-white/70 p-5 lg:border-l lg:border-t-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Resumo executivo</p>
+            <div className="mt-4 space-y-4">
+              <div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink-muted">Pico da inadimplência</span>
+                  <strong className="text-ink-strong">{currencyFormatter.format(analytics.delinquencySnapshot.peakValue)}</strong>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted">
+                  <div className="h-full rounded-full bg-finance-red" style={{ width: '100%' }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink-muted">Saldo atual em risco</span>
+                  <strong className="text-ink-strong">{currencyFormatter.format(analytics.delinquencySnapshot.currentValue)}</strong>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted">
+                  <div
+                    className="h-full rounded-full bg-finance-green"
+                    style={{
+                      width: `${analytics.delinquencySnapshot.peakValue > 0 ? Math.max(4, (analytics.delinquencySnapshot.currentValue / analytics.delinquencySnapshot.peakValue) * 100) : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="rounded-lg bg-surface-muted px-3 py-3 text-sm leading-5 text-ink-body">
+                A leitura considera apenas títulos de inadimplência efetiva: Protestado e Em Cartório. Status Aberto ou Corrigido ficam fora da curva de queda.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel grid overflow-hidden sm:grid-cols-2 lg:grid-cols-5">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.title} {...kpi} />
         ))}
