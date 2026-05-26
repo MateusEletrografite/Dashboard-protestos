@@ -10,18 +10,17 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
-import { Suspense, lazy, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AdvancedTable } from '../components/dashboard/AdvancedTable'
 import { FilterBar } from '../components/dashboard/FilterBar'
 import { KpiCard } from '../components/dashboard/KpiCard'
+import { ChartsGrid } from '../components/dashboard/ChartsGrid'
 import { UploadDropzone } from '../components/upload/UploadDropzone'
 import { DEFAULT_FILTERS } from '../data/filters'
 import { useDashboardAnalytics } from '../hooks/useDashboardAnalytics'
 import { useDashboardData } from '../hooks/useDashboardData'
 import type { DashboardFilters } from '../types/dashboard'
 import { currencyFormatter, decimalFormatter, integerFormatter } from '../utils/formatters'
-
-const ChartsGrid = lazy(() => import('../components/dashboard/ChartsGrid').then((module) => ({ default: module.ChartsGrid })))
 
 function percentage(value: number, total: number): string {
   if (total <= 0) {
@@ -297,16 +296,7 @@ export function DashboardPage() {
         ))}
       </section>
 
-      <Suspense
-        fallback={
-          <div className="grid gap-4 xl:grid-cols-2">
-            <div className="panel h-[360px] animate-pulse bg-surface-muted" />
-            <div className="panel h-[360px] animate-pulse bg-surface-muted" />
-          </div>
-        }
-      >
-        <ChartsGrid analytics={analytics} />
-      </Suspense>
+      <ChartsGrid analytics={analytics} />
 
       <AdvancedTable records={analytics.filteredRecords} />
     </div>
