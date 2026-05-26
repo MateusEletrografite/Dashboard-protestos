@@ -124,6 +124,34 @@ export function ChartsGrid({ analytics }: ChartsGridProps) {
         </ChartCard>
       </div>
 
+      <div className="xl:col-span-2">
+        <ChartCard title="Inadimplência mensal em colunas" subtitle="Valor em atraso por mês de vencimento, considerando protestados e títulos em cartório">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={analytics.delinquencyTrend} margin={{ left: 8, right: 18, top: 18, bottom: 4 }}>
+              <CartesianGrid stroke={chartColors.grid} vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: chartColors.slate }} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                width={78}
+                tick={{ fontSize: 12, fill: chartColors.slate }}
+                tickFormatter={(value) => compactCurrencyFormatter.format(Number(value))}
+              />
+              <Tooltip formatter={(value) => currencyTooltip(value)} labelClassName="font-semibold" />
+              <Legend iconType="circle" formatter={() => <span className="text-sm text-ink-body">Valor inadimplente</span>} />
+              <Bar dataKey="inadimplencia" name="Valor inadimplente" radius={[6, 6, 0, 0]} barSize={44}>
+                {analytics.delinquencyTrend.map((entry, index) => {
+                  const previous = analytics.delinquencyTrend[index - 1]
+                  const isFalling = previous ? entry.inadimplencia < previous.inadimplencia : false
+
+                  return <Cell key={entry.dateKey} fill={isFalling ? chartColors.green : chartColors.red} />
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+
       <ChartCard title="Evolução temporal" subtitle="Valor emitido por mês de emissão">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={analytics.temporalEvolution} margin={{ left: 8, right: 16, top: 8, bottom: 4 }}>
